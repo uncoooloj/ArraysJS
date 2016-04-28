@@ -1,25 +1,3 @@
-/*
-requesttype: 'GET' / 'POST' / 'DELETE' / etc (optional)
-callbackfn: function (XMLHttpRequest) { ... }
-data: string or object. if object, object is stringified (optional)
-headers: HttpHeaders set as Array whose objects have properties key and value (optional)
- */
-function http_request(url, requesttype, callbackfn, data, headers) {
-    requesttype = requesttype || "GET";
-    headers = headers || [];
-    headers.forEach(function (header) {
-        http.setRequestHeader(header.key, header.value);
-    });
-    if (data && typeof data != 'string') data = JSON.stringify(data);
-    var http = new XMLHttpRequest();
-    http.onreadystatechange = function() { 
-        if (http.readyState == 4 && http.status == 200 && callbackfn)
-            callbackfn(http);
-    }
-    http.open(requesttype, url, true); // true for asynchronous 
-    http.send(data);
-}
-
 //adds an item into array
 Array.prototype.add = function (item) {
     var arr = this;
