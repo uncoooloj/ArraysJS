@@ -1,4 +1,26 @@
-/*adds an item into array*/
+/*
+requesttype: 'GET' / 'POST' / 'DELETE' / etc (optional)
+callbackfn: function (XMLHttpRequest) { ... }
+data: string or object. if object, object is stringified (optional)
+headers: HttpHeaders set as Array whose objects have properties key and value (optional)
+ */
+function http_request(url, requesttype, callbackfn, data, headers) {
+    requesttype = requesttype || "GET";
+    headers = headers || [];
+    headers.forEach(function (header) {
+        http.setRequestHeader(header.key, header.value);
+    });
+    if (data && typeof data != 'string') data = JSON.stringify(data);
+    var http = new XMLHttpRequest();
+    http.onreadystatechange = function() { 
+        if (http.readyState == 4 && http.status == 200 && callbackfn)
+            callbackfn(http);
+    }
+    http.open(requesttype, url, true); // true for asynchronous 
+    http.send(data);
+}
+
+//adds an item into array
 Array.prototype.add = function (item) {
     var arr = this;
     arr.push(item);
@@ -6,15 +28,35 @@ Array.prototype.add = function (item) {
 }
 
 /*adds an item into the array, if the array does not already have 
-    an item whose [arrprop] property matches itemval*/
-Array.prototype.addif = function (item, arrprop, itemval) {
+    an item whose [prop] property matches the value of item's similar property*/
+Array.prototype.addif = function (item, prop) {
     var arr = this;
-    if (!arr.contains(arrprop, itemval)) {
-        arr.add(item);
+    if (prop) {
+        if (!arr.contains(item[prop], prop)) {
+            arr.add(item);
+        }
+        else {
+            var matches = arr.where(prop, item[prop]);
+            if (matches.count() > 0) matches[0] = item;
+        }
     }
     else {
-        var matches = arr.selectWhere(arrprop, itemval);
-        if (matches.count() > 0) matches[0] = item;
+        if (!arr.contains(item)) {
+            arr.add(item);
+        }
+    }
+    return arr;
+}
+
+Array.prototype.toggle = function (item, prop) {
+    var arr = this;
+    if (!prop) {
+        if (arr.contains(item)) arr.remove(item);
+        else arr.add(item);
+    }
+    else {
+        if (arr.contains(item[prop], prop)) arr.remove(item[prop], prop);
+        else arr.add(item);
     }
     return arr;
 }
@@ -28,6 +70,16 @@ Array.prototype.addRange = function (arrs) {
     return arr;
 }
 
+Array.prototype.from = function (index) {
+    var arr = this;
+    var ret = [];
+    index = index || 0;
+    for (var i = index; i < arr.length; i++) {
+        ret.push(arr[i]);
+    }
+    return ret;
+}
+
 /*Gets the first item in the array, or first range of items. Usage: arr.first() or arr.first(count)*/
 Array.prototype.first = function (count) {
     var arr = this.valueOf();
@@ -39,14 +91,14 @@ Array.prototype.first = function (count) {
     }
     else {
         var ret = [];
-        for (var i = 0; i < Math.min(count, arr.count()); i++) {
+        for (var i = 0; i < Math.min(count, arr.count()) ; i++) {
             ret.add(arr[i]);
         }
         return ret;
     }
 }
 
-/*Gets the last item in the array, or last range of items. Usage: arr.last() or arr.last(count)*/
+//Gets the last item in the array, or last range of items. Usage: arr.last() or arr.last(count)
 Array.prototype.last = function (count) {
     var arr = this;
     if (count == undefined) {
@@ -57,24 +109,15 @@ Array.prototype.last = function (count) {
     }
     else {
         var ret = [];
-        for (var i = Math.max(arr.length - count, 0); i < arr.length; i++) {
+        for (var i = Math.max(arr.length - count, 0) ; i < arr.length; i++) {
             ret.add(arr[i]);
         }
         return ret;
     }
 }
 
-/*Gets a sublist from the array, starting from an index*/
-Array.prototype.from = function (index) {
-    var arr = this;
-    var ret = [];
-    for (var i = index; i < arr.length; i++) {
-        ret.push(arr[i]);
-    }
-    return ret;
-}
-
-/*Gets a sub-array with items whose specified property match a specified value. Usage: arr.selectWhere(property as string, value to match).
+/*Gets a sub-array with items whose specified property match a specified value. Usage: arr.selectWhere(property as string, 
+value to match).
 *Can be chained. E.g. arr.selectWhere(prop, val).selectWhere(prop1, val1).selectWhere(prop2, val2)
 */
 Array.prototype.selectWhere = function (prop, val) {
@@ -88,10 +131,10 @@ Array.prototype.selectWhere = function (prop, val) {
     return ret;
 }
 
-//Gets a sublist whose children are equal to, or have properties that equal a value *chainable*
 Array.prototype.where = function (prop, val) {
     var arr = this;
-    return arr.selectWhere(prop, val);
+    if (typeof prop == "string") return arr.selectWhere(prop, val);
+    if (typeof prop == "function") return arr.selectByFunction(prop);
 }
 
 /*Gets a sub-array where properties have values specified
@@ -141,7 +184,7 @@ Array.prototype.selectByFunction = function (condition) {
 *Note: For best performance, use on primitive types only
 */
 Array.prototype.sort = function (type) {
-    var arr = this;
+    var arr = this.valueOf();
     var swapped;
     do {
         swapped = false;
@@ -230,6 +273,7 @@ Array.prototype.bsearch = function (item) {
 */
 Array.prototype.sortBy = function (prop, type) {
     var arr = this;
+    if (!prop) return arr.sort(type);
     var swapped;
     do {
         swapped = false;
@@ -247,6 +291,26 @@ Array.prototype.sortBy = function (prop, type) {
         }
     }
     while (swapped);
+}
+
+Array.prototype.sortfn = function (fn) {
+    fn = fn || function (val1, val2) { return val1 > val2; }
+    if (typeof fn != 'function') fn =function (val1, val2) { return val1 > val2; }
+    var arr = this;
+    var swapped;
+    do {
+        swapped = false;
+        for (var i = 0; i < arr.length - 1; i++) {
+            if (fn(arr[i], arr[i + 1])) {
+                var temp = arr[i];
+                arr[i] = arr[i + 1];
+                arr[i + 1] = temp;
+                swapped = true;
+            }
+        }
+    }
+    while (swapped);
+    return arr;
 }
 
 /*returns boolean whether the array is sorted or not
@@ -297,6 +361,7 @@ Array.prototype.clear = function () {
     while (arr.count() > 0) {
         arr.pop();
     }
+    return arr;
 }
 
 //returns number of items in array. same as array.length. Usage: arr.count()
@@ -310,6 +375,7 @@ Array.prototype.count = function () {
 */
 Array.prototype.indexOfProp = function (item, prop) {
     var arr = this;
+    if (!prop) return arr.indexOf(item); 
     for (var i = 0; i < arr.length; i++) {
         if (arr[i][prop] == item) {
             return i;
@@ -420,21 +486,32 @@ Array.prototype.create = function (items) {
     return ret;
 }
 
-Array.create = Array.prototype.create;
-
 /*Returns an array of items consisting of all numbers starting from Number(start) till and including Number(end)*/
 Array.prototype.range = function (start, end) {
     var arr = this;
     var ret = [];
-    for (var i = start; i <= end; i++) {
-        ret.add(i);
+    start = start || 0;
+    if (!end) {
+        for (var i = 0; i < start; i++) {
+            ret.add(i);
+        }
+    }
+    else {
+        for (var i = start; i <= end; i++) {
+            ret.add(i);
+        }
     }
     return ret;
 }
 
-//Returns a new array filled with properties of the items in the original array
+Array.range = function (start, end) {
+    return [].range(start, end);
+}
+
+//returns an array containing the values of designated property in each of its items
 Array.prototype.select = function (prop) {
     var arr = this;
+    if (!prop) return this.valueOf();
     var ret = [];
     arr.selectByFunction(function (i) {
         ret.push(arr[i][prop]);
@@ -442,21 +519,28 @@ Array.prototype.select = function (prop) {
     return ret;
 }
 
-//Returns a boolean that states whether the array is empty or not
+//true, if the array is empty
 Array.prototype.isEmpty = function () {
     return this.length == 0;
 }
 
-//works like Array.foreach, i guess ... i have never used Array.foreach
+/*pass in a function with an item as argument to be performed on each item of the array ... e.g.
+
+[].each(function (item) { 
+    ...
+});
+*/
 Array.prototype.each = function (fn) {
     var arr = this;
+    
     for (var i = 0; i < arr.length; i++) {
+        arr.index = i;
         fn(arr[i]);
     }
+    delete arr.index;
     return arr;
 }
 
-//returns a flattened version of an array, whose items are also arrays
 Array.prototype.flatten = function () {
     var arr = this.valueOf();
     var ret = [];
@@ -475,27 +559,17 @@ Array.prototype.flatten = function () {
     return arr;
 }
 
-//works just like Array.join ... i didn't know Array.join existed when i wrote this
 Array.prototype.string = function (place) {
-	var arr = this;
-	var str = "";
-	arr.each(function (item) {
-	str += item + place;
-});
-return str;
-}
-
-//finds the average of an array of numbers. Make sure you use it with numbers
-Array.prototype.average = function () {
     var arr = this;
-    var total = 0;
+    var str = "";
+    place = place || "";
     arr.each(function (item) {
-        if (Number(item)) total += Number(item);
+        str += item + place;
     });
-    return total / arr.count();
+    return str;
 }
 
-//divides an array into pages, each of a fixed length/size
+//divides an array into pages, with a maximum size
 Array.prototype.paginate = function (maxsize) {
     if (!maxsize) maxsize = 10;
     var arr = this;
@@ -520,9 +594,10 @@ Array.prototype.paginate = function (maxsize) {
     return ret;
 }
 
-//finds and returns the minimum item in an array
+//returns the minimum array item
 Array.prototype.min = function () {
     var arr = this;
+    if (arr.isEmpty()) return 0;
     var min = arr.first();
     if (arr.count() > 0) {
         arr.each(function (item) {
@@ -533,9 +608,10 @@ Array.prototype.min = function () {
     return undefined;
 }
 
-//finds and returns the maximum item in an array
+//returns the maximum array item
 Array.prototype.max = function () {
     var arr = this;
+    if (arr.isEmpty()) return 0;
     var max = arr.first();
     if (arr.count() > 0) {
         arr.each(function (item) {
@@ -546,7 +622,43 @@ Array.prototype.max = function () {
     return undefined;
 }
 
-//selects and returns an item in an array randomly
+/*This should used for numbers. It returns the average*/
+Array.prototype.average = function () {
+    var arr = this;
+    var total = 0;
+    arr.each(function (item) {
+        if (Number(item)) total += Number(item);
+    });
+    return total / arr.count();
+}
+
+Array.prototype.sum = function () {
+    var arr = this;
+    var sum = 0;
+    arr.each(function (x) {
+        sum += x;
+    });
+    return sum;
+}
+
+/*Lets you sync arrays by comparing a particular property, 
+    which acts as a primary key, making sure that the values of that property 
+    in each item in that array are unique*/
+Array.prototype.sync = function (arr2, prop) {
+    var arr = this;
+    if (prop) {
+        arr2.each(function (item) {
+           arr.addif(item, prop); 
+        });
+    }
+    else {
+        arr2.each(function (item) {
+            arr.addif(item);
+        })
+    }
+    return arr;
+}
+
 Array.prototype.random = function (count) {
     var arr = this.valueOf();
     if (count && Number.isSafeInteger(count)) {
@@ -557,4 +669,41 @@ Array.prototype.random = function (count) {
     else {
         return arr.shuffle().first();
     }
+}
+
+Array.prototype.all = function (fn) {
+    var b = true;
+    var arr = this;
+    fn = fn || function (i) {return true};
+    arr.each(function (item) {
+        if (fn(item) == false) b = false;
+    });
+    return b;
+}
+
+Array.prototype.frequency = function (value, prop) {
+    var arr = this;
+    if (!prop) {
+        var count = 0;
+        arr.each(function (val) {
+            if (val == value) count++;
+        });
+        return count;
+    }
+    else {
+        var count = 0;
+        arr.each(function (val) {
+            if (val[prop] == value) count++;
+        });
+        return count;
+    }
+}
+
+Array.prototype.trim = function () {
+    var arr = this;
+    var ret = [];
+    arr.each(function (item) {
+        if (item) ret.add(item);
+    });
+    return ret;
 }
