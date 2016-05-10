@@ -639,13 +639,16 @@ Array.prototype.sync = function (arr2, prop) {
 
 Array.prototype.random = function (count) {
     var arr = this.valueOf();
-    if (count && Number.isSafeInteger(count)) {
+    if (count && !isNaN(count) && typeof count == 'number') {
+        if (arr.length == 0) return undefined;
+        var ret = [];
         for (var i = 0; i < count; i++) {
-            return arr.shuffle().first(count);
+            ret.push(arr[Math.floor(Number(Math.random() * arr.length))]);
         }
+        return ret;
     }
     else {
-        return arr.shuffle().first();
+        return arr[Math.floor(Number(Math.random() * arr.length))];
     }
 }
 
