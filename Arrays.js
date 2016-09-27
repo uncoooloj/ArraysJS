@@ -327,7 +327,8 @@ Array.prototype.insert = function (item, index) {
         ret.add(arr[i]);
     }
     arr.clear();
-    arr = ret;
+    arr.addRange(ret);
+    arr.prev = [];
     return ret;
 }
 
@@ -688,3 +689,24 @@ Array.prototype.trim = function () {
     });
     return ret;
 }
+
+/* An enhanced version of the togGle() function.
+   Toggling the arraY toggle(value) On and Off Like a switch*/
+Array.prototype.xtoggle = function (item) {
+        var arr = this;
+        if (arr.indexOf(item) >= 0) {
+            var index = arr.indexOf(item);
+            arr.prev.push({index: index, value: item});
+            arr.remove(item);
+        }
+        else {
+            var prevValue = arr.prev.where('value', item).first();
+            if (typeof prevValue.index != 'undefined') {
+                arr.insert(prevValue.value, prevValue.index);
+                arr.prev.remove(prevValue.index, 'index');
+            }
+            else arr.push(item);
+        }
+        return arr;
+    };
+    
