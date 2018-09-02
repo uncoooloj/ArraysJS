@@ -45,7 +45,7 @@ console.log(arr); //should print out [1,2,3,4,5,6]
 *[property_name]:* A string, specifying the property name of the array's children objects to check.
 
 ###### Usage
-Adds an item into the array, if the array does not already have an child with the same value, or an child whose property (with key property_name) has the same value as item[property_name]. The argument, [property_name] is optional.
+Adds an item into the array, if the array does not already have a child with the same value, or a child whose property (with key property_name) has the same value as item[property_name]. The argument, [property_name] is optional.
 ```
 var arr = [1,2,3]
 arr.addif(4); //[1,2,3,4]
